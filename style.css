@@ -118,3 +118,85 @@ section {
     font-weight: 700;
     font-size: 20px;
 }
+
+/* ------------------------------------------------------------------- */
+/* @MEDIA QUERY PARA DISPOSITIVOS COMPACTOS (TOTALMENTE TRAVADO) */
+/* ------------------------------------------------------------------- */
+
+@media (max-width: 1200px) {
+    /* CORREÇÕES CRÍTICAS AQUI: REMOVIDAS AS PROPRIEDADES QUE CAUSAVAM SCROLL */
+    body {
+        margin: 0; /* CORREÇÃO: REMOVIDO o problemático margin-top: 20px; que estava aqui antes */
+        /* CORREÇÃO: REMOVIDO o problemático max-height: 70%; que estava aqui antes */
+        padding: 0; /* Garante que o body não tenha padding */
+    }
+
+    #logo-converter {
+       display: none; /* Logo principal escondido, como definido por você */
+    }
+
+    main {
+        
+        width: 80%; /* Mantido em 70% conforme sua última instrução */
+        max-width: none;
+        height: 50%;
+        
+        margin-top: 20px; /* Remove todas as margens externas do main */
+        padding: 15px 10px; /* Mantido o padding que você definiu */
+        /* flex-grow: 1; e display: flex; flex-direction: column; já estão no estilo base */
+        justify-content: space-around; /* Distribui o espaço entre os elementos do main */
+    }
+
+    /* As definições de tamanho para label, select, input, button, section, etc.
+       FORAM MANTIDAS EXATAMENTE COMO VOCÊ AS ENVIOU NO ÚLTIMO CÓDIGO. */
+
+    label {
+        font-size: 12px;
+    }
+
+    select,
+    input {
+        height: 36px;
+        margin-bottom: 10px;
+        padding-left: 8px;
+        font-size: 13px;
+    }
+
+    button {
+        height: 36px;
+        font-size: 15px;
+        margin-bottom: 10px;
+    }
+
+    section {
+        margin-top: 15px;
+        padding: 8px;
+        border-radius: 10px;
+        min-height: 150px;
+    }
+
+    #arrow {
+        margin: 8px 0;
+    }
+
+    .box {
+        padding: 5px 0;
+        min-height: 120px;
+    }
+
+    .logo-converter {
+        width: 50px;
+        height: 50px;
+        margin: 3px auto;
+    }
+
+    .moeda {
+        font-size: 20px;
+    }
+
+    .valor,
+    .valor2 {
+        font-size: 20px;
+    }
+}
+

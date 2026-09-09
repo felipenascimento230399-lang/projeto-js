@@ -1,10 +1,10 @@
-const convertButton = document.querySelector(" .convertbutton")
-const currencySelectTo = document.querySelector(".currency-select")
+const convertButton = document.querySelector(".convertbutton");
+const currencySelectTo = document.querySelector(".currency-select");
 const currencySelectFrom = document.querySelector(".currency-select-from");
 
 const inputCurrencyValueElement = document.querySelector("#input-value");
-const currencyValueToConvertElement = document.querySelector(".valor"); 
-const currencyValueConvertedElement = document.querySelector(".valor2"); 
+const currencyValueToConvertElement = document.querySelector(".valor");
+const currencyValueConvertedElement = document.querySelector(".valor2");
 
 const currencyNameFromElement = document.getElementById("moeda-origem");
 const currencyImageFromElement = document.getElementById("logo-origem");
@@ -12,16 +12,22 @@ const currencyImageFromElement = document.getElementById("logo-origem");
 const currencyNameToElement = document.getElementById("moeda-convertida");
 const currencyImageToElement = document.getElementById("logo-convercao");
 
+// VOCÊ PRECISA DESTE SELETOR PARA O INDICADOR DE CARREGAMENTO!
+const loadingIndicatorElement = document.getElementById("loading-indicator");
 
-const exchangeRates = {
+// URL da API como uma constante para facilitar futuras alterações
+const CURRENCY_API_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL";
+
+// --- Variáveis de Estado ---
+let exchangeRates = {
     brl: 1,
-    usd: 5.11,
-    eur: 5.89,
-    gbp: 6.90,
-    btc: 328855.97
+    usd: 5.11, // Valor de fallback
+    eur: 5.89, // Valor de fallback
+    gbp: 6.90, // Valor de fallback
+    btc: 328855.97 // Bitcoin geralmente precisa de outra API ou ser hardcoded
 };
 
-const currencyInfo = {
+let currencyInfo = {
     brl: { name: "Real Brasileiro", img: "./assets/real.png" },
     usd: { name: "Dólar Americano", img: "./assets/dolar.png" },
     eur: { name: "Euro", img: "./assets/euro.png" },
@@ -29,8 +35,17 @@ const currencyInfo = {
     btc: { name: "Bitcoin", img: "./assets/bitcoin 1.png" }
 };
 
+// --- Funções Utilitárias ---
+
+/**
+ * @description Formata um valor numérico para o formato de moeda específico.
+ * Lida com Bitcoin com mais casas decimais.
+ * @param {number} value - O valor numérico a ser formatado.
+ * @param {string} currencyCode - O código da moeda (ex: "brl", "usd").
+ * @param {string} locale - O locale para formatação (ex: "pt-br", "en-US").
+ * @returns {string} O valor formatado como string.
+ */
 const formatCurrency = (value, currencyCode, locale = "pt-br") => {
-    
     if (currencyCode === "btc") {
         return new Intl.NumberFormat("en-US", {
             style: "decimal",
@@ -38,79 +53,141 @@ const formatCurrency = (value, currencyCode, locale = "pt-br") => {
             maximumFractionDigits: 8,
         }).format(value);
     }
-    
+
     return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: currencyCode.toUpperCase()
     }).format(value);
 };
 
+/**
+ * @description Exibe ou esconde o indicador de carregamento na interface.
+ * @param {boolean} show - `true` para mostrar o indicador, `false` para esconder.
+ */
+const toggleLoadingIndicator = (show) => {
+    if (loadingIndicatorElement) {
+        loadingIndicatorElement.style.display = show ? "block" : "none";
+    }
+};
+
+// --- Funções Principais de Lógica ---
+
+/**
+ * @description Busca as últimas taxas de câmbio da API e atualiza o objeto `exchangeRates`.
+ * Inclui tratamento de erros e fallback para valores padrão em caso de falha da API.
+ */
+async function fetchExchangeRates() {
+    toggleLoadingIndicator(true);
+    try {
+        const response = await fetch(CURRENCY_API_URL);
+
+        if (!response.ok) {
+            throw new Error(`Erro HTTP! Status: ${response.status}. Detalhes: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+
+        let updatedAnyRate = false;
+
+        if (data.USDBRL && data.USDBRL.bid) {
+            exchangeRates.usd = parseFloat(data.USDBRL.bid);
+            updatedAnyRate = true;
+        }
+        if (data.EURBRL && data.EURBRL.bid) {
+            exchangeRates.eur = parseFloat(data.EURBRL.bid);
+            updatedAnyRate = true;
+        }
+        if (data.GBPBRL && data.GBPBRL.bid) {
+            exchangeRates.gbp = parseFloat(data.GBPBRL.bid);
+            updatedAnyRate = true;
+        }
+
+        if (updatedAnyRate) {
+            console.log("Taxas de câmbio atualizadas com sucesso:", exchangeRates);
+        } else {
+            console.warn("Nenhuma taxa de câmbio específica (USD, EUR, GBP) foi atualizada pela API. Verifique a estrutura dos dados.");
+        }
+
+    } catch (error) {
+        console.error("Erro ao buscar taxas de câmbio da API:", error);
+        console.warn("Usando taxas de câmbio padrão (hardcoded) devido ao erro.");
+    } finally {
+        toggleLoadingIndicator(false);
+    }
+}
+
+/**
+ * @description Realiza a conversão dos valores com base nas moedas selecionadas e nas taxas atuais.
+ * Atualiza os elementos de exibição na interface do usuário.
+ */
 function convertValues() {
-    // Usamos parseFloat para garantir que o valor do input seja um número
     const inputValue = parseFloat(inputCurrencyValueElement.value);
 
-    // Se o input estiver vazio ou não for um número, definimos como 0 para evitar erros
     if (isNaN(inputValue) || inputValue === null) {
         inputCurrencyValueElement.value = "0";
-        // Podemos exibir 0 nas moedas para não bugar
         currencyValueToConvertElement.innerHTML = formatCurrency(0, currencySelectFrom.value, "pt-br");
         currencyValueConvertedElement.innerHTML = formatCurrency(0, currencySelectTo.value, "pt-br");
-        return; // Sai da função para não processar um valor inválido
+        return;
     }
 
-    const fromCurrencyCode = currencySelectFrom.value; // Código da moeda de origem (ex: 'brl')
-    const toCurrencyCode = currencySelectTo.value;     // Código da moeda de destino (ex: 'usd')
+    const fromCurrencyCode = currencySelectFrom.value;
+    const toCurrencyCode = currencySelectTo.value;
 
-    // 1. Converter o valor de entrada para BRL (moeda base)
-    // Ex: Se input é 10 USD, e 1 USD = 5.11 BRL, então valueInBRL = 10 * 5.11 = 51.1 BRL
     const valueInBRL = inputValue * exchangeRates[fromCurrencyCode];
-
-    // 2. Converter o valor em BRL para a moeda de destino
-    // Ex: Se valueInBRL é 51.1 BRL, e 1 EUR = 5.89 BRL, então convertedValue = 51.1 / 5.89 = 8.67 EUR
     const convertedValue = valueInBRL / exchangeRates[toCurrencyCode];
 
-    // Exibir o valor de origem formatado
     currencyValueToConvertElement.innerHTML = formatCurrency(inputValue, fromCurrencyCode, "pt-br");
 
-    // Exibir o valor convertido formatado
-    // Definimos o locale específico para algumas moedas para melhor formatação
-    let targetLocale = "pt-br"; // Locale padrão
+    let targetLocale = "pt-br";
     if (toCurrencyCode === "usd") targetLocale = "en-US";
     else if (toCurrencyCode === "eur") targetLocale = "de-DE";
     else if (toCurrencyCode === "gbp") targetLocale = "en-GB";
 
     currencyValueConvertedElement.innerHTML = formatCurrency(convertedValue, toCurrencyCode, targetLocale);
 }
-function updateSourceCurrencyDisplay() { // <-- ESTA FUNÇÃO ESTAVA FALTANDO!
-    const selectedCurrencyCode = currencySelectFrom.value;
-    const info = currencyInfo[selectedCurrencyCode];
 
-    if (info) {
-        currencyNameFromElement.innerHTML = info.name;
-        currencyImageFromElement.src = info.img;
-    }
-    convertValues(); // Recalcula os valores sempre que a moeda de origem muda
-}
-// Função para atualizar o display da moeda de DESTINO (nome e imagem)
-function updateTargetCurrencyDisplay() {
-    const selectedCurrencyCode = currencySelectTo.value;
-    const info = currencyInfo[selectedCurrencyCode];
+/**
+ * @description Atualiza a exibição do nome e imagem de uma moeda na interface.
+ * @param {HTMLSelectElement} selectElement - O elemento `<select>` (origem ou destino).
+ * @param {HTMLElement} nameElement - O elemento HTML onde o nome da moeda será exibido.
+ * @param {HTMLImageElement} imageElement - O elemento `<img>` onde a imagem da moeda será exibida.
+ */
+function updateCurrencyDisplay(selectElement, nameElement, imageElement) {
+    const selectedCurrencyCode = selectElement.value;
+    const { name, img } = currencyInfo[selectedCurrencyCode] || { name: "Desconhecido", img: "" };
 
-    if (info) {
-        currencyNameToElement.innerHTML = info.name;
-        currencyImageToElement.src = info.img;
-    }
-    convertValues(); // Recalcula os valores sempre que a moeda de destino muda
-}
+    nameElement.innerHTML = name;
+    imageElement.src = img;
 
-// Adição de Event Listeners
-currencySelectFrom.addEventListener("change", updateSourceCurrencyDisplay); // NOVO: Evento para o select de origem
-currencySelectTo.addEventListener("change", updateTargetCurrencyDisplay);  // Seu evento existente (renomeado)
-convertButton.addEventListener("click", convertValues);
-
-// Chama as funções uma vez ao carregar a página para definir o estado inicial
-document.addEventListener("DOMContentLoaded", () => {
-    updateSourceCurrencyDisplay();
-    updateTargetCurrencyDisplay();
     convertValues();
-})
+}
+
+// --- Inicialização e Event Listeners ---
+
+/**
+ * @description Função principal de inicialização do aplicativo.
+ * Garante que as taxas da API sejam carregadas antes de configurar os event listeners
+ * e realizar a primeira atualização da interface.
+ */
+async function initializeApp() {
+    await fetchExchangeRates();
+
+    currencySelectFrom.addEventListener("change", () => updateCurrencyDisplay(
+        currencySelectFrom,
+        currencyNameFromElement,
+        currencyImageFromElement
+    ));
+    currencySelectTo.addEventListener("change", () => updateCurrencyDisplay(
+        currencySelectTo,
+        currencyNameToElement,
+        currencyImageToElement
+    ));
+    convertButton.addEventListener("click", convertValues);
+
+    updateCurrencyDisplay(currencySelectFrom, currencyNameFromElement, currencyImageFromElement);
+    updateCurrencyDisplay(currencySelectTo, currencyNameToElement, currencyImageToElement);
+    convertValues();
+}
+
+// Garante que o script só execute após o DOM (Document Object Model) estar completamente carregado.
+document.addEventListener("DOMContentLoaded", initializeApp);
